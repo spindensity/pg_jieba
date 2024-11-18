@@ -17,3 +17,6 @@ build/
 # MAC
 .DS_Store
 .ds_store
+
+# MSVC_BUILD DIR
+/msvc_build

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8.0 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.21.0 FATAL_ERROR)
 
 set(CMAKE_COLOR_MAKEFILE ON)
 
@@ -8,11 +8,28 @@ project("${PG_JIEBA_PROJECT_ID}")
 
 message(STATUS "Setting ${CMAKE_PROJECT_NAME} build type - ${CMAKE_BUILD_TYPE}")
 
+if(MSVC)
+    add_compile_options("$<$<C_COMPILER_ID:MSVC>:/utf-8>")
+    add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
+    add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/std:c++20>")
+
+    set(PostgreSQL_ROOT "C:/Program Files/PostgreSQL")
+    set(PostgreSQL_ADDITIONAL_VERSIONS "16")
+
+    add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+    add_definitions(-D_HAS_AUTO_PTR_ETC=1)
+    add_definitions(-D_SILENCE_CXX17_NEGATORS_DEPRECATION_WARNING)
+endif(MSVC)
+
 find_package(PostgreSQL REQUIRED)
 if(NOT PostgreSQL_FOUND)
     message(FATAL_ERROR " Please check your PostgreSQL installation.")
 endif(NOT PostgreSQL_FOUND)
-
+if(MSVC)
+    list(PREPEND PostgreSQL_INCLUDE_DIRS
+    "${PostgreSQL_TYPE_INCLUDE_DIR}/port/win32_msvc"
+    "${PostgreSQL_TYPE_INCLUDE_DIR}/port/win32")
+endif(MSVC)
 
 include_directories(${PostgreSQL_INCLUDE_DIRS} ${PostgreSQL_TYPE_INCLUDE_DIR})
 link_directories(${PostgreSQL_LIBRARY_DIRS})
@@ -35,18 +52,28 @@ if(DEBUG_MODE)
     SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g")
 endif(DEBUG_MODE)
 
-find_program(PostgreSQL_PG_CONFIG NAMES pg_config
+if(MSVC)
+    find_program(PostgreSQL_PG_CONFIG NAMES pg_config
+        PATHS
+        "${PostgreSQL_ROOT}/*/bin/")
+else(MSVC)
+    find_program(PostgreSQL_PG_CONFIG NAMES pg_config
         PATHS
         /usr/lib/postgresql/*/bin/)
+endif(MSVC)
 
 execute_process(COMMAND ${PostgreSQL_PG_CONFIG} --cflags
                 OUTPUT_STRIP_TRAILING_WHITESPACE
                 OUTPUT_VARIABLE PG_CFLAGS)
+string(REPLACE "not recorded" "" PG_CFLAGS "${PG_CFLAGS}")
+string(REPLACE "没有被记录" "" PG_CFLAGS "${PG_CFLAGS}")
 SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${PG_CFLAGS}")
 
 execute_process(COMMAND ${PostgreSQL_PG_CONFIG} --cppflags
                 OUTPUT_STRIP_TRAILING_WHITESPACE
                 OUTPUT_VARIABLE PG_CPPFLAGS)
+string(REPLACE "not recorded" "" PG_CPPFLAGS "${PG_CPPFLAGS}")
+string(REPLACE "没有被记录" "" PG_CPPFLAGS "${PG_CPPFLAGS}")
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${PG_CPPFLAGS}")
 
 execute_process(
@@ -97,9 +124,14 @@ else(APPLE)
 endif(APPLE)
 
 add_library(${PG_JIEBA_LIBRARY_NAME} ${LIBRARY_MODE_TARGET} ${SOURCE_FILES})
+
+if(MSVC)
+    target_link_libraries("${PG_JIEBA_LIBRARY_NAME}" "postgres.lib")
+endif(MSVC)
+
 set_target_properties("${PG_JIEBA_LIBRARY_NAME}" PROPERTIES
                       OUTPUT_NAME "${PG_JIEBA_DLL_NAME}"
-                      CXX_STANDARD 11
+                      CXX_STANDARD 20
                       CXX_STANDARD_REQUIRED YES
                       CXX_EXTENSIONS NO
                       POSITION_INDEPENDENT_CODE ON
@@ -109,9 +141,6 @@ if(APPLE)
                           PROPERTIES
                           LINK_FLAGS "-flat_namespace -undefined suppress")
 endif(APPLE)
-if(WIN32 AND MSVC)
-    set_target_properties(${PG_JIEBA_LIBRARY_NAME} PROPERTIES PREFIX "lib")
-endif(WIN32 AND MSVC)
 
 install(TARGETS "${PG_JIEBA_LIBRARY_NAME}"
         DESTINATION "${PG_JIEBA_EXTENSION_DIR}")
