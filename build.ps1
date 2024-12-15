@@ -3,8 +3,8 @@ Set-StrictMode -Version Latest
 $PSNativeCommandUseErrorActionPreference = $true
 
 cmd /c .\_build.bat
-gsudo cmake --install msvc_build
-gsudo Restart-Service -Name postgresql-x64-16
+sudo cmake --install msvc_build
+sudo Restart-Service -Name postgresql-x64-16
 
 Write-Host You need change "shared_preload_libraries" settings in postgresql.conf in
 Write-Host your Postgresql data direcotry to contain the "pg_jieba" lib, for excample:
